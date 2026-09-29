@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent console</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1b1f24; background: #f6f8fa; height: 100vh; display: flex; flex-direction: column; }
+    header { background: #0A192F; color: #fff; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    header b { flex: 1; }
+    header input { padding: 6px 8px; border-radius: 6px; border: 0; }
+    .wrap { flex: 1; display: grid; grid-template-columns: 300px 1fr; min-height: 0; }
+    aside { border-right: 1px solid #d8dee4; overflow-y: auto; background: #fff; }
+    aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #57606a; margin: 14px 14px 6px; }
+    .conv { padding: 10px 14px; border-bottom: 1px solid #eef1f4; cursor: pointer; font-size: 13px; }
+    .conv:hover, .conv.active { background: #eef6ff; }
+    .conv small { color: #57606a; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #fff1e5; color: #9a3412; margin-left: 4px; }
+    section { display: flex; flex-direction: column; min-height: 0; }
+    .toolbar { padding: 10px 14px; border-bottom: 1px solid #d8dee4; display: flex; gap: 8px; align-items: center; background: #fff; }
+    .toolbar span { flex: 1; font-size: 13px; color: #57606a; }
+    button { border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; background: #0A66C2; color: #fff; }
+    button.secondary { background: #eef1f4; color: #1b1f24; }
+    .log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .m { max-width: 70%; padding: 8px 12px; border-radius: 10px; font-size: 14px; white-space: pre-wrap; }
+    .m small { display: block; font-size: 11px; color: #57606a; }
+    .visitor { background: #fff; border: 1px solid #d8dee4; align-self: flex-start; }
+    .ai { background: #eef1f4; align-self: flex-end; }
+    .agent { background: #0A66C2; color: #fff; align-self: flex-end; }
+    .agent small { color: #dbeafe; }
+    .system { align-self: center; font-size: 12px; color: #57606a; }
+    form { display: flex; border-top: 1px solid #d8dee4; background: #fff; }
+    form input { flex: 1; border: 0; padding: 14px; font-size: 14px; outline: none; }
+    .empty { margin: auto; color: #57606a; }
+    #leads { font-size: 13px; padding: 0 14px 14px; }
+    @media (max-width: 700px) { .wrap { grid-template-columns: 1fr; } aside { max-height: 35vh; } }
+  </style>
+</head>
+<body>
+  <header>
+    <b>Agent console</b>
+    <label>Agent token <input id="token" type="password" placeholder="AGENT_TOKEN" autocomplete="off"></label>
+    <span id="state"></span>
+  </header>
+  <div class="wrap">
+    <aside>
+      <div id="lists"></div>
+      <h3>Leads</h3>
+      <div id="leads">None yet.</div>
+    </aside>
+    <section>
+      <div class="toolbar"><span id="title">Select a conversation</span>
+        <button id="takeover" hidden>Take over</button>
+        <button id="release" class="secondary" hidden>Hand back to AI</button>
+      </div>
+      <div class="log" id="log"><p class="empty">Chats appear here as visitors use the widget.</p></div>
+      <form id="reply" hidden><input name="text" placeholder="Reply as the agent…" maxlength="1000" autocomplete="off"><button>Send</button></form>
+    </section>
+  </div>
+<script>
+(function () {
+  "use strict";
+  var tokenInput = document.getElementById("token"), state = document.getElementById("state");
+  var current = null;
+  try { tokenInput.value = sessionStorage.getItem("agent-token") || ""; } catch (e) {}
+  tokenInput.addEventListener("change", function () {
+    try { sessionStorage.setItem("agent-token", tokenInput.value); } catch (e) {}
+    refresh();
+  });
+
+  function api(path, method, body) {
+    return fetch(path, {
+      method: method || "GET",
+      headers: { "Authorization": "Bearer " + tokenInput.value, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (r.status === 401) { state.textContent = "Enter the agent token"; throw new Error("auth"); }
+      state.textContent = "";
+      return r.json();
+    });
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderLists(data) {
+    var box = document.getElementById("lists");
+    box.textContent = "";
+    [["waiting", "Waiting for a person"], ["human", "With an agent"], ["ai", "AI handling"]].forEach(function (g) {
+      box.appendChild(el("h3", null, g[1] + " (" + data[g[0]].length + ")"));
+      data[g[0]].forEach(function (c) {
+        var row = el("div", "conv" + (current === c.id ? " active" : ""));
+        row.appendChild(document.createTextNode("#" + c.id.slice(0, 6)));
+        if (c.lead) row.appendChild(el("span", "tag", c.lead.email || c.lead.phone));
+        row.appendChild(el("small", null, c.last_message ? c.last_message.role + ": " + c.last_message.text : ""));
+        row.onclick = function () { current = c.id; refresh(); };
+        box.appendChild(row);
+      });
+    });
+  }
+
+  function renderConversation(c) {
+    var log = document.getElementById("log");
+    log.textContent = "";
+    document.getElementById("title").textContent = "#" + c.id.slice(0, 6) + " · " + (c.mode === "human" ? "you are answering" : "AI is answering");
+    document.getElementById("takeover").hidden = c.mode === "human";
+    document.getElementById("release").hidden = c.mode !== "human";
+    document.getElementById("reply").hidden = false;
+    c.messages.forEach(function (m) {
+      var b = el("div", "m " + m.role);
+      if (m.role !== "system") b.appendChild(el("small", null, m.role));
+      b.appendChild(document.createTextNode(m.text));
+      log.appendChild(b);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function renderLeads(leads) {
+    var box = document.getElementById("leads");
+    box.textContent = leads.length ? "" : "None yet.";
+    leads.forEach(function (l) {
+      box.appendChild(el("div", null, (l.name ? l.name + " · " : "") + (l.email || "") + (l.phone ? " " + l.phone : "")));
+    });
+  }
+
+  function refresh() {
+    if (!tokenInput.value) { state.textContent = "Enter the agent token"; return; }
+    api("/api/agent/conversations").then(renderLists).catch(function () {});
+    api("/api/agent/leads").then(renderLeads).catch(function () {});
+    if (current) api("/api/agent/conversations/" + current).then(renderConversation).catch(function () {});
+  }
+
+  document.getElementById("takeover").onclick = function () { api("/api/agent/conversations/" + current + "/takeover", "POST").then(refresh); };
+  document.getElementById("release").onclick = function () { api("/api/agent/conversations/" + current + "/release", "POST").then(refresh); };
+  document.getElementById("reply").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = e.target.elements.text, text = input.value.trim();
+    if (!text || !current) return;
+    input.value = "";
+    api("/api/agent/conversations/" + current + "/reply", "POST", { text: text }).then(refresh);
+  });
+
+  refresh();
+  setInterval(refresh, 2500);
+})();
+</script>
+</body>
+</html>

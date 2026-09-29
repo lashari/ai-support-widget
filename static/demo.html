@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acme Cloud Hosting — widget demo</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1b1f24; background: #fff; }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 16px; line-height: 1.6; }
+    h1 { margin-bottom: 4px; }
+    code { background: #f6f8fa; padding: 2px 6px; border-radius: 4px; }
+    .hint { background: #f6f8fa; border: 1px solid #d8dee4; border-radius: 10px; padding: 16px 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Acme Cloud Hosting</h1>
+    <p>A pretend company page. The chat bubble in the bottom-right corner is the widget, loaded with one script tag.</p>
+    <div class="hint">
+      <strong>Try asking:</strong>
+      <ul>
+        <li>How much does hosting cost?</li>
+        <li>Do you do refunds?</li>
+        <li>Can you move my site from another host?</li>
+        <li>Something it can't know, like "Do you sell laptops?" — it hands off to a person instead of guessing.</li>
+      </ul>
+      Then open <a href="/agent" target="_blank">/agent</a> in another tab to see the chat live, take it over and reply as a human.
+    </div>
+  </main>
+  <script src="/static/widget.js" data-title="Acme Support" data-color="#0A66C2" defer></script>
+</body>
+</html>
