@@ -1,5 +1,7 @@
 # AI Support Widget 💬
 
+[![CI](https://github.com/lashari/ai-support-widget/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lashari/ai-support-widget/actions/workflows/ci.yml)
+
 A drop-in **AI customer-support chat** for any website: one `<script>` tag, answers
 **stream in token by token**, the bot **hands off to a person instead of guessing**,
 and a small **agent console** lets a human take over a live chat and hand it back.
@@ -142,9 +144,18 @@ Agent routes need `Authorization: Bearer $AGENT_TOKEN`. Interactive docs are at 
 ## Tests
 
 ```bash
-pip install -r requirements-dev.txt
-pytest -q
+pip install -r requirements-dev.txt   # app + test dependencies
+python -m pytest -q
 ```
+
+Use `python -m pytest`, not bare `pytest`: it puts the repo root on `sys.path` so
+the `app` package imports without being installed.
+
+**CI** ([workflow](.github/workflows/ci.yml)) runs the suite on every push and pull
+request to `main`, on **Python 3.11 and 3.12**, with network access blocked
+(`pytest-socket`; only the local socket pair asyncio needs is allowed), so no API key
+is needed. Each run also reports line coverage for `app/` in the job log and run
+summary.
 
 30 tests, no network needed. They cover retrieval (including a false-positive
 regression and off-topic questions that must *not* match), streaming, the handoff
